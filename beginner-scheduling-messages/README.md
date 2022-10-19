@@ -34,3 +34,10 @@ Short Description: Best suited description
 ```
 - Click Save Button.
 - Go to Settings > Install App and click Reinstall App button.
+
+## App Home Page
+In Event Subscription section of Slack app configuration page.
+
+- Add app_home_opened event
+- Properly configure Request URL (I recommend using a new URL and verify if it works with challenge requests)
+- Click Save Changes button
