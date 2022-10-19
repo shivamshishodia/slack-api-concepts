@@ -20,16 +20,6 @@
             <artifactId>bolt-jetty</artifactId> <!-- will resolve "bolt" and "bolt-servlet" artifacts as its dependencies -->
             <version>1.26.1</version>
         </dependency>
-        <!-- <dependency>
-            <groupId>com.slack.api</groupId>
-            <artifactId>bolt</artifactId>
-            <version>1.26.1</version>
-        </dependency>
-        <dependency>
-            <groupId>com.slack.api</groupId>
-            <artifactId>bolt-servlet</artifactId>
-            <version>1.26.1</version>
-        </dependency> -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>

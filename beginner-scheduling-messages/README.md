@@ -41,3 +41,9 @@ In Event Subscription section of Slack app configuration page.
 - Add app_home_opened event
 - Properly configure Request URL (I recommend using a new URL and verify if it works with challenge requests)
 - Click Save Changes button
+
+## Reaction Reply
+Ensure that OAuth & Permissions has `reactions:read` scope. Also, Event Subscriptions > Subscribe to bot events should have `reaction_added` added. Reinstall the application and test.
+
+## Respond to patterns
+Ensure that OAuth & Permissions has `chat:write` and `chat:write:public` scope. Also, Event Subscriptions > Subscribe to bot events should have `message.channels` added. Reinstall the application and test.
