@@ -1,6 +1,8 @@
 package com.shishodia.slack;
 
 import java.io.IOException;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.regex.Pattern;
 
 import org.slf4j.LoggerFactory;
@@ -12,18 +14,19 @@ import com.slack.api.bolt.jetty.SlackAppServer;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.model.event.AppHomeOpenedEvent;
+import com.slack.api.model.event.MessageDeletedEvent;
 import com.slack.api.model.event.ReactionAddedEvent;
 import static com.slack.api.model.block.Blocks.*;
 import static com.slack.api.model.block.composition.BlockCompositions.*;
 import static com.slack.api.model.view.Views.*;
 import static com.slack.api.model.block.element.BlockElements.*;
 
-public class Main {
+public class MessagingApplication {
 
     static void publishMessage(String id, String text) {
         // you can get this instance via ctx.client() in a Bolt app
         var client = Slack.getInstance().methods();
-        var logger = LoggerFactory.getLogger("beginner-scheduling-messages");
+        var logger = LoggerFactory.getLogger("beginner-messages");
         try {
             // Call the chat.postMessage method using the built-in WebClient
             var result = client.chatPostMessage(r -> r
@@ -67,7 +70,7 @@ public class Main {
                     )
                 )
             );
-            var res = ctx.client().viewsPublish(r -> r.userId(payload.getEvent().getUser()).view(appHomeView));
+            ctx.client().viewsPublish(r -> r.userId(payload.getEvent().getUser()).view(appHomeView));
             return ctx.ack();
         });
 
@@ -87,7 +90,7 @@ public class Main {
         });
 
         // Respond to patterns.
-        Pattern sdk = Pattern.compile(".*[(hello)|(Java SDK)|(Bolt)|(slack\\-java\\-sdk)].*", Pattern.CASE_INSENSITIVE);
+        Pattern sdk = Pattern.compile(".*[(Java SDK)|(Bolt)|(slack\\-java\\-sdk)].*", Pattern.CASE_INSENSITIVE);
         app.message(sdk, (req, ctx) -> {
             var logger = ctx.logger;
             try {
@@ -111,6 +114,35 @@ public class Main {
 		app.command("/hello", (req, ctx) -> {
 			return ctx.ack(":wave: Hello, " + req.getPayload().getUserName() + "!");
 		});
+
+        // Schedule messages.
+        app.command("/schedule", (req, ctx) -> {
+            var logger = ctx.logger;
+            var futureTimestamp = ZonedDateTime.now().truncatedTo(ChronoUnit.SECONDS).plusSeconds(10);
+            try {
+                var payload = req.getPayload();
+                // Call the chat.scheduleMessage method using the built-in WebClient
+                var result = ctx.client().chatScheduleMessage(r -> r
+                    // The token you used to initialize your app
+                    // .token(ctx.getBotToken())
+                    .channel(payload.getChannelId())
+                    .text(payload.getText())
+                    // Time to post message, in Unix Epoch timestamp format
+                    .postAt((int) futureTimestamp.toInstant().getEpochSecond())
+                );
+                // Print result
+                logger.info("result: {}", result);
+            } catch (IOException | SlackApiException e) {
+                logger.error("error: {}", e.getMessage(), e);
+            }
+            // Acknowledge incoming command event
+            return ctx.ack();
+        });
+
+        // Deleted messages.
+        app.event(MessageDeletedEvent.class, (payload, ctx) -> {
+            return ctx.ack();
+        });
 
         var server = new SlackAppServer(app);
         server.start();

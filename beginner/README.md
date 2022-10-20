@@ -1,4 +1,4 @@
-# Scheduling Messages
+# Messaging App
 
 ## References
 - [Post messages on a schedule](https://api.slack.com/tutorials/tracks/scheduling-messages).
@@ -10,7 +10,7 @@
 - `ngrok http 3000` (after starting the Bolt app.)
 
 ## Details
-- App Name: beginner-scheduling-messages
+- App Name: messaging-app
 - Workspace: sandbox-training
 
 ## Scopes
@@ -47,3 +47,9 @@ Ensure that OAuth & Permissions has `reactions:read` scope. Also, Event Subscrip
 
 ## Respond to patterns
 Ensure that OAuth & Permissions has `chat:write` and `chat:write:public` scope. Also, Event Subscriptions > Subscribe to bot events should have `message.channels` added. Reinstall the application and test.
+
+## Todo
+- Invoke OCI via patterns (https://docs.oracle.com/en-us/iaas/api/#/en/logan-api-spec/20200601/Namespace/GetNamespace)
+- LOGAN App: Integrate OCI CLI (log analytics)
+- File read and upload
+- Authorization
