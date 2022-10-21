@@ -4,9 +4,10 @@
 - [Responding to app mentions](https://api.slack.com/tutorials/tracks/responding-to-app-mentions).
 - [Getting Started with Bolt (Socket Mode)](https://slack.dev/java-slack-sdk/guides/getting-started-with-bolt-socket-mode).
 - [App Hosting](https://api.slack.com/docs/hosting)
+- [Event Types](https://api.slack.com/events)
+- [Events API](https://api.slack.com/apis/connections/events-api)
 
 ## Setup
-
 - pom.xml (check project object model for required dependencies)
 - Set scope: Go to OAuth & Permissions > Scopes > `app_mentions:read` and `commands`. Reinstall your application.
 - Set event: Go to Event Subscriptions > Subscribe to bot events > `app_mentions`. Reinstall your application.
