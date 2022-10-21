@@ -1,4 +1,4 @@
-# Messaging App
+# Messaging Application
 
 ## References
 - [Post messages on a schedule](https://api.slack.com/tutorials/tracks/scheduling-messages).
