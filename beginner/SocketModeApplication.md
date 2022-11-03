@@ -35,3 +35,6 @@ Short Description: Best suited description
 ```
 - Click Save Button.
 - Go to Settings > Install App and click Reinstall App button.
+
+## Execution
+mvn exec:java
