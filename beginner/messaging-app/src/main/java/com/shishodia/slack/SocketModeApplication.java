@@ -112,7 +112,7 @@ public class SocketModeApplication {
                     // The token you used to initialize your app
                     // .token(ctx.getBotToken())
                     .channel(payload.getChannelId())
-                    .text(payload.getText() + "(Scheduled)")
+                    .text(payload.getText() + " [Scheduled]")
                     // Time to post message, in Unix Epoch timestamp format
                     .postAt((int) futureTimestamp.toInstant().getEpochSecond())
                 );
