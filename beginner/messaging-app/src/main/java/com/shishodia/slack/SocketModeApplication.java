@@ -5,15 +5,22 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+
+import com.slack.api.app_backend.slash_commands.payload.SlashCommandPayload;
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
 import com.slack.api.bolt.socket_mode.SocketModeApp;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import com.slack.api.methods.response.chat.ChatScheduleMessageResponse;
 import com.slack.api.model.event.AppHomeOpenedEvent;
 import com.slack.api.model.event.AppMentionEvent;
 import com.slack.api.model.event.MessageDeletedEvent;
+import com.slack.api.model.event.MessageEvent;
 import com.slack.api.model.event.ReactionAddedEvent;
+import com.slack.api.model.view.View;
+
 import static com.slack.api.model.block.Blocks.*;
 import static com.slack.api.model.block.composition.BlockCompositions.*;
 import static com.slack.api.model.view.Views.*;
@@ -41,7 +48,7 @@ public class SocketModeApplication {
 
         // App Home Page.
         app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
-            var appHomeView = view(view -> view
+            View appHomeView = view(view -> view
                 .type("home")
                 .blocks(asBlocks(
                     section(section -> section.text(markdownText(mt -> mt.text("*Welcome to your personal space* :tada:")))),
@@ -73,11 +80,11 @@ public class SocketModeApplication {
         // Respond to patterns.
         Pattern sdk = Pattern.compile(".*[(Java SDK)|(Bolt)|(slack\\-java\\-sdk)].*", Pattern.CASE_INSENSITIVE);
         app.message(sdk, (req, ctx) -> {
-            var logger = ctx.logger;
+            Logger logger = ctx.logger;
             try {
-                var event = req.getEvent();
+                MessageEvent event = req.getEvent();
                 // Call the chat.postMessage method using the built-in WebClient
-                var result = ctx.client().chatPostMessage(r -> r
+                ChatPostMessageResponse result = ctx.client().chatPostMessage(r -> r
                     // The token you used to initialize your app is stored in the `context` object
                     // .token(ctx.getBotToken())
                     // Payload message should be posted in the channel where original message was heard
@@ -103,12 +110,12 @@ public class SocketModeApplication {
 
         // Schedule messages.
         app.command("/schedule", (req, ctx) -> {
-            var logger = ctx.logger;
-            var futureTimestamp = ZonedDateTime.now().truncatedTo(ChronoUnit.SECONDS).plusSeconds(10);
+            Logger logger = ctx.logger;
+            ZonedDateTime futureTimestamp = ZonedDateTime.now().truncatedTo(ChronoUnit.SECONDS).plusSeconds(10);
             try {
-                var payload = req.getPayload();
+                SlashCommandPayload payload = req.getPayload();
                 // Call the chat.scheduleMessage method using the built-in WebClient
-                var result = ctx.client().chatScheduleMessage(r -> r
+                ChatScheduleMessageResponse result = ctx.client().chatScheduleMessage(r -> r
                     // The token you used to initialize your app
                     // .token(ctx.getBotToken())
                     .channel(payload.getChannelId())

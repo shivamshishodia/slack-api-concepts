@@ -5,17 +5,24 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.slack.api.Slack;
+import com.slack.api.app_backend.slash_commands.payload.SlashCommandPayload;
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
 import com.slack.api.bolt.jetty.SlackAppServer;
+import com.slack.api.methods.MethodsClient;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
+import com.slack.api.methods.response.chat.ChatScheduleMessageResponse;
 import com.slack.api.model.event.AppHomeOpenedEvent;
 import com.slack.api.model.event.MessageDeletedEvent;
+import com.slack.api.model.event.MessageEvent;
 import com.slack.api.model.event.ReactionAddedEvent;
+import com.slack.api.model.view.View;
+
 import static com.slack.api.model.block.Blocks.*;
 import static com.slack.api.model.block.composition.BlockCompositions.*;
 import static com.slack.api.model.view.Views.*;
@@ -25,11 +32,11 @@ public class MessagingApplication {
 
     static void publishMessage(String id, String text) {
         // you can get this instance via ctx.client() in a Bolt app
-        var client = Slack.getInstance().methods();
-        var logger = LoggerFactory.getLogger("beginner-messages");
+        MethodsClient client = Slack.getInstance().methods();
+        Logger logger = LoggerFactory.getLogger("beginner-messages");
         try {
             // Call the chat.postMessage method using the built-in WebClient
-            var result = client.chatPostMessage(r -> r
+            ChatPostMessageResponse result = client.chatPostMessage(r -> r
                 // The token you used to initialize your app
                 .token(System.getenv("SLACK_BOT_TOKEN"))
                 .channel(id)
@@ -45,10 +52,10 @@ public class MessagingApplication {
 
 	public static void main(String[] args) throws Exception {
 
-        var config = new AppConfig();
+        AppConfig config = new AppConfig();
         config.setSingleTeamBotToken(System.getenv("SLACK_BOT_TOKEN"));
         config.setSigningSecret(System.getenv("SLACK_SIGNING_SECRET"));
-        var app = new App(config);
+        App app = new App(config);
 
         // Publish messages, two ways.
         // publishMessage("C046MP6T9N3", "Hello world :tada:");
@@ -60,7 +67,7 @@ public class MessagingApplication {
 
         // App Home Page.
         app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
-            var appHomeView = view(view -> view
+            View appHomeView = view(view -> view
                 .type("home")
                 .blocks(asBlocks(
                     section(section -> section.text(markdownText(mt -> mt.text("*Welcome to your personal space* :tada:")))),
@@ -92,11 +99,11 @@ public class MessagingApplication {
         // Respond to patterns.
         Pattern sdk = Pattern.compile(".*[(Java SDK)|(Bolt)|(slack\\-java\\-sdk)].*", Pattern.CASE_INSENSITIVE);
         app.message(sdk, (req, ctx) -> {
-            var logger = ctx.logger;
+            Logger logger = ctx.logger;
             try {
-                var event = req.getEvent();
+                MessageEvent event = req.getEvent();
                 // Call the chat.postMessage method using the built-in WebClient
-                var result = ctx.client().chatPostMessage(r -> r
+                ChatPostMessageResponse result = ctx.client().chatPostMessage(r -> r
                     // The token you used to initialize your app is stored in the `context` object
                     // .token(ctx.getBotToken())
                     // Payload message should be posted in the channel where original message was heard
@@ -117,12 +124,12 @@ public class MessagingApplication {
 
         // Schedule messages.
         app.command("/schedule", (req, ctx) -> {
-            var logger = ctx.logger;
-            var futureTimestamp = ZonedDateTime.now().truncatedTo(ChronoUnit.SECONDS).plusSeconds(10);
+            Logger logger = ctx.logger;
+            ZonedDateTime futureTimestamp = ZonedDateTime.now().truncatedTo(ChronoUnit.SECONDS).plusSeconds(10);
             try {
-                var payload = req.getPayload();
+                SlashCommandPayload payload = req.getPayload();
                 // Call the chat.scheduleMessage method using the built-in WebClient
-                var result = ctx.client().chatScheduleMessage(r -> r
+                ChatScheduleMessageResponse result = ctx.client().chatScheduleMessage(r -> r
                     // The token you used to initialize your app
                     // .token(ctx.getBotToken())
                     .channel(payload.getChannelId())
@@ -144,7 +151,7 @@ public class MessagingApplication {
             return ctx.ack();
         });
 
-        var server = new SlackAppServer(app);
+        SlackAppServer server = new SlackAppServer(app);
         server.start();
 	}
 
