@@ -89,9 +89,9 @@ public class SocketModeApplication {
                     // .token(ctx.getBotToken())
                     // Payload message should be posted in the channel where original message was heard
                     .channel(event.getChannel())
+                    .threadTs(event.getEventTs()) // Remove this if the response is not thread reply.
                     .text("Pattern detected!")
                 );
-                logger.info("result: {}", result);
             } catch (IOException | SlackApiException e) {
                 logger.error("error: {}", e.getMessage(), e);
             }
@@ -124,7 +124,7 @@ public class SocketModeApplication {
                     .postAt((int) futureTimestamp.toInstant().getEpochSecond())
                 );
                 // Print result
-                logger.info("result: {}", result);
+                logger.info("response url: {}", req.getResponseUrl());
             } catch (IOException | SlackApiException e) {
                 logger.error("error: {}", e.getMessage(), e);
             }
