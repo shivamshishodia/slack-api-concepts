@@ -3,10 +3,15 @@ package com.shishodia.slack;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import com.slack.api.app_backend.slash_commands.payload.SlashCommandPayload;
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
@@ -14,6 +19,7 @@ import com.slack.api.bolt.socket_mode.SocketModeApp;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.chat.ChatScheduleMessageResponse;
+import com.slack.api.methods.response.files.FilesUploadResponse;
 import com.slack.api.model.event.AppHomeOpenedEvent;
 import com.slack.api.model.event.AppMentionEvent;
 import com.slack.api.model.event.MessageDeletedEvent;
@@ -125,6 +131,34 @@ public class SocketModeApplication {
                 );
                 // Print result
                 logger.info("response url: {}", req.getResponseUrl());
+            } catch (IOException | SlackApiException e) {
+                logger.error("error: {}", e.getMessage(), e);
+            }
+            // Acknowledge incoming command event
+            return ctx.ack();
+        });
+
+        // Prettify a ugly JSON string.
+        String uglyJSONString = "{'totalMatchedCount':211486626,'arePartialResults':false,'columns':[{'type':'COLUMN','displayName':'Log Source','subSystem':'LOG','values':[{'displayValue':'Linux Syslog Logs','internalValue':'LinuxSyslogSource','isDeleted':false}],'isListOfValues':true,'isMultiValued':false,'isCaseSensitive':false,'isGroupable':true,'isEvaluable':true,'valueType':'STRING','internalName':'msrcid'},{'type':'COLUMN','displayName':'Time','subSystem':'LOG','values':[],'isListOfValues':false,'isMultiValued':false,'isCaseSensitive':false,'isGroupable':false,'isEvaluable':true,'valueType':'TIMESTAMP','internalName':'time'}]}";
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        app.command("/prettify", (req, ctx) -> {
+            Logger logger = ctx.logger;
+            try {
+                SlashCommandPayload payload = req.getPayload();
+                JsonElement je = JsonParser.parseString(uglyJSONString);
+                // Call the files.upload method using the built-in WebClient
+                FilesUploadResponse result = ctx.client().filesUpload(r -> r
+                        // The token you used to initialize your app is stored in the `context` object
+                        // .token(ctx.getBotToken())
+                        .channels(Arrays.asList(payload.getChannelId()))
+                        .initialComment("Here's your pretty-printed file :smile:")
+                        // Filetypes: https://api.slack.com/types/file#file_types
+                        .filetype("json") 
+                        .filename("Prettify File")
+                        // Include your filename in a ReadStream here
+                        .content(gson.toJson(je)));
+                // Print result
+                logger.info("result: {}", result);
             } catch (IOException | SlackApiException e) {
                 logger.error("error: {}", e.getMessage(), e);
             }
