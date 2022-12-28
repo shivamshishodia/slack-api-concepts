@@ -6,6 +6,7 @@ import com.slack.api.bolt.socket_mode.SocketModeApp;
 import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.views.ViewsOpenResponse;
+import com.slack.api.methods.response.views.ViewsPublishResponse;
 import com.slack.api.model.block.composition.OptionObject;
 import com.slack.api.model.event.AppHomeOpenedEvent;
 import com.slack.api.model.view.View;
@@ -14,6 +15,7 @@ import static com.slack.api.model.view.Views.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -35,10 +37,19 @@ public class InvestigationApplication {
 		App app = new App(AppConfig.builder().singleTeamBotToken(botToken).build());
 
 		// App Home Page.
-		// TODO: Static list.
 		List<OptionObject> options = new ArrayList<>();
+
 		OptionObject objOne = new OptionObject();
+		objOne.setText(plainText(pti -> pti.text("Pie")));
 		options.add(objOne);
+
+		OptionObject objTwo = new OptionObject();
+		objTwo.setText(plainText(pti -> pti.text("Histogram")));
+		options.add(objTwo);
+
+		OptionObject objThree = new OptionObject();
+		objThree.setText(plainText(pti -> pti.text("Data")));
+		options.add(objThree);
 
 		app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
 			View appHomeView = view(view -> view
@@ -54,12 +65,12 @@ public class InvestigationApplication {
 									.blockId("query-input")
 									.element(plainTextInput(pti -> pti.actionId("query-input-pti").maxLength(255)))
 									.label(plainText(pt -> pt.text("Query").emoji(true)))),
-							// input(input -> input
-							// .blockId("chart-input")
-							// .label(plainText(pt -> pt.text("Chart Type").emoji(true)))
-							// .element(staticSelect(
-							// ss -> ss.placeholder(plainText(pt -> pt.text("Select an item").emoji(true)))
-							// .options(options)))),
+							input(input -> input
+									.blockId("chart-input")
+									.label(plainText(pt -> pt.text("Chart Type").emoji(true)))
+									.element(staticSelect(
+									ss -> ss.placeholder(plainText(pt -> pt.text("Select an item").emoji(true)))
+									.options(options)))),
 							section(section -> section
 									.blockId("start-date")
 									.text(markdownText(mt -> mt.text("Pick a start date")))
@@ -79,7 +90,7 @@ public class InvestigationApplication {
 											.text(plainText(pt -> pt.text("Create Investigation").emoji(true)))
 											.value("click_123").actionId("click-btn"))))
 			)));
-			ctx.client().viewsPublish(r -> r.userId(payload.getEvent().getUser()).view(appHomeView));
+			ViewsPublishResponse vw = ctx.client().viewsPublish(r -> r.userId(payload.getEvent().getUser()).view(appHomeView));
 			return ctx.ack();
 		});
 
@@ -130,7 +141,8 @@ public class InvestigationApplication {
 					break;
 				}
                 // The name of the file you're going to upload
-                var filepath = "/Users/shivamshishodia/Desktop/Investigation/slack-api-concepts/beginner/messaging-app/src/main/java/com/shishodia/slack/resources/" + chartType;
+				String userDirectory = Paths.get("").toAbsolutePath().toString();
+                var filepath = userDirectory + "/beginner/messaging-app/src/main/java/com/shishodia/slack/resources/" + chartType;
                 // Call the files.upload method using the built-in WebClient
                 var result = ctx.client().filesUpload(r -> r
                     // The token you used to initialize your app is stored in the `context` object
@@ -150,39 +162,21 @@ public class InvestigationApplication {
             return ctx.ack();
         });
 
-		// TODO: Global shortcuts.
+		// Global shortcuts.
 		app.globalShortcut("launch_query", (req, ctx) -> {
 			View appHomeView = view(view -> view
-			.blocks(asBlocks(
-					section(section -> section
-							.text(markdownText(mt -> mt.text("*Hi Shivam, Welcome to your personal space*")))),
-					divider(),
-					section(section -> section.text(markdownText(mt -> mt.text(
-							"You can create your own investigations and execute queries from this home page. For more details please refer <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI>.")))),
-					divider(),
-					input(input -> input
-							.blockId("query-input")
-							.element(plainTextInput(pti -> pti.actionId("query-input-pti").maxLength(255)))
-							.label(plainText(pt -> pt.text("Query").emoji(true)))),
-					section(section -> section
-							.blockId("start-date")
-							.text(markdownText(mt -> mt.text("Pick a start date")))
-							.accessory(datePicker(dp -> dp.actionId("datepicker-action")
-									.initialDate("2022-12-25")
-									.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
-					section(section -> section
-							.blockId("end-date")
-							.text(markdownText(mt -> mt.text("Pick an end date")))
-							.accessory(datePicker(dp -> dp.actionId("datepicker-action")
-									.initialDate("2022-12-25")
-									.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
-					section(section -> section
-							.blockId("click-btn")
-							.text(markdownText(mt -> mt.text("Initiate an investigation")))
-							.accessory(button(btn -> btn
-									.text(plainText(pt -> pt.text("Create Investigation").emoji(true)))
-									.value("click_123").actionId("click-btn")))))));
-			ctx.client().viewsOpen(r -> r
+					.type("modal")
+					.callbackId("slack-view-sample")
+					.title(viewTitle(title -> title.type("plain_text").text("Slack View").emoji(true)))
+					.submit(viewSubmit(submit -> submit.type("plain_text").text("Submit").emoji(true)))
+					.close(viewClose(close -> close.type("plain_text").text("Cancel").emoji(true)))
+					.blocks(asBlocks(
+							section(section -> section
+									.text(markdownText(mt -> mt.text("*Hi Shivam, Welcome to your personal space*")))),
+							divider(),
+							section(section -> section.text(markdownText(mt -> mt.text(
+									"You can create your own investigations and execute queries from this home page. For more details please refer <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI>.")))))));
+			ViewsOpenResponse vw = ctx.client().viewsOpen(r -> r
 					.triggerId(ctx.getTriggerId())
 					.view(appHomeView));
 			return ctx.ack();
