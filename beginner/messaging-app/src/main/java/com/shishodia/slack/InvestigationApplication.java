@@ -1,5 +1,6 @@
 package com.shishodia.slack;
 
+import com.shishodia.slack.modals.Query;
 import com.slack.api.bolt.App;
 import com.slack.api.bolt.AppConfig;
 import com.slack.api.bolt.socket_mode.SocketModeApp;
@@ -7,9 +8,12 @@ import com.slack.api.methods.SlackApiException;
 import com.slack.api.methods.response.chat.ChatPostMessageResponse;
 import com.slack.api.methods.response.views.ViewsOpenResponse;
 import com.slack.api.methods.response.views.ViewsPublishResponse;
+import com.slack.api.methods.response.views.ViewsUpdateResponse;
 import com.slack.api.model.block.composition.OptionObject;
 import com.slack.api.model.event.AppHomeOpenedEvent;
 import com.slack.api.model.view.View;
+import com.slack.api.model.view.ViewState;
+import com.slack.api.model.view.ViewState.Value;
 
 import static com.slack.api.model.view.Views.*;
 
@@ -18,9 +22,12 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 
 import static com.slack.api.model.block.Blocks.*;
@@ -29,37 +36,89 @@ import static com.slack.api.model.block.element.BlockElements.*;
 
 public class InvestigationApplication {
 
+	Map<String, Query> userData = new HashMap<String, Query>();
+
+	private List<OptionObject> staticChartList() {
+		List<OptionObject> options = new ArrayList<>();
+
+		OptionObject objOne = new OptionObject();
+		objOne.setText(plainText(pti -> pti.text("Pie")));
+		objOne.setValue("pie");
+		options.add(objOne);
+
+		OptionObject objTwo = new OptionObject();
+		objTwo.setText(plainText(pti -> pti.text("Histogram")));
+		objTwo.setValue("histogram");
+		options.add(objTwo);
+
+		OptionObject objThree = new OptionObject();
+		objThree.setText(plainText(pti -> pti.text("Data")));
+		objThree.setValue("data");
+		options.add(objThree);
+
+		return options;
+	}
+
+	private Query processQueryData(Map<String, Map<String, Value>> formData) {
+		Query queryData = new Query();
+
+		for (Map.Entry<String, Map<String, Value>> ele : formData.entrySet()) {
+			Map<String, Value> keyValue = ele.getValue();
+			if (ele.getKey().equals("query-input")) {
+				String queryInput = keyValue.get("query-input-pti").getValue();
+				queryData.setQuery(queryInput == null ? StringUtils.EMPTY : queryInput);
+			} else if (ele.getKey().equals("chart-input")) {
+				String chartInput = keyValue.values().stream().findFirst().get().getSelectedOption().getValue();
+				queryData.setChartType(chartInput == null ? StringUtils.EMPTY : chartInput);
+			} else if (ele.getKey().equals("start-date")) {
+				String startDate = keyValue.get("datepicker-action-start-date").getValue();
+				queryData.setStartDate(startDate == null ? StringUtils.EMPTY : startDate);
+			} else if (ele.getKey().equals("end-date")) {
+				String endDate = keyValue.get("datepicker-action-end-date").getValue();
+				queryData.setEndDate(endDate == null ? StringUtils.EMPTY : endDate);
+			}
+		}
+
+		return queryData;
+	}
+
+	private boolean addQueryData(String userId, Query queryData) {
+		userData.put(userId, queryData);
+		return true;
+	}
+
+	private String generateMarkdownForQuery(Query query) {
+		return String.format("`%s` chart generated for query `%s` or date range between `%s` and `%s`", 
+			query.getChartType(), query.getQuery(), "2022-10-22", "2022-10-22");
+	}
+
 	public static void main(String[] args) throws Exception {
+
+		InvestigationApplication obj = new InvestigationApplication();
 
 		String botToken = System.getenv("SLACK_BOT_TOKEN");
 		String appToken = System.getenv("SLACK_APP_TOKEN");
 
 		App app = new App(AppConfig.builder().singleTeamBotToken(botToken).build());
 
-		// App Home Page.
-		List<OptionObject> options = new ArrayList<>();
+		// Global Shortcut Flow 
+		// (Global Shortcut > Modal Launch Query > Modal Show Graph). Refer https://api.slack.com/surfaces/modals/using.
 
-		OptionObject objOne = new OptionObject();
-		objOne.setText(plainText(pti -> pti.text("Pie")));
-		options.add(objOne);
-
-		OptionObject objTwo = new OptionObject();
-		objTwo.setText(plainText(pti -> pti.text("Histogram")));
-		options.add(objTwo);
-
-		OptionObject objThree = new OptionObject();
-		objThree.setText(plainText(pti -> pti.text("Data")));
-		options.add(objThree);
-
-		app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
+		// Global shortcuts.
+		app.globalShortcut("launch_query", (req, ctx) -> {
 			View appHomeView = view(view -> view
-					.type("home")
-					.blocks(asBlocks(
+					.type("modal")
+					.callbackId("global_shortcut_launch_query")
+					.title(viewTitle(title -> title.type("plain_text").text("Launch Query").emoji(true)))
+					.submit(viewSubmit(submit -> submit.type("plain_text").text("Save Query").emoji(true)))
+					.close(viewClose(close -> close.type("plain_text").text("Cancel").emoji(true)))
+					.blocks(
+						asBlocks(
 							section(section -> section
-									.text(markdownText(mt -> mt.text("*Hi Shivam, Welcome to your personal space*")))),
+									.text(markdownText(mt -> mt.text("*Welcome to your personal investigation space!*")))),
 							divider(),
 							section(section -> section.text(markdownText(mt -> mt.text(
-									"You can create your own investigations and execute queries from this home page. For more details please refer <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI>.")))),
+									"You can now create your own investigations and execute queries using this interface. For more details please refer the documentation given on <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI|LOGAN Investigations Documentation>.")))),
 							divider(),
 							input(input -> input
 									.blockId("query-input")
@@ -70,7 +129,95 @@ public class InvestigationApplication {
 									.label(plainText(pt -> pt.text("Chart Type").emoji(true)))
 									.element(staticSelect(
 									ss -> ss.placeholder(plainText(pt -> pt.text("Select an item").emoji(true)))
-									.options(options)))),
+									.options(obj.staticChartList())))),
+							section(section -> section
+									.blockId("start-date")
+									.text(markdownText(mt -> mt.text("Pick a start date")))
+									.accessory(datePicker(dp -> dp.actionId("datepicker-action-start-date")
+											.initialDate("2022-12-25")
+											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
+							section(section -> section
+									.blockId("end-date")
+									.text(markdownText(mt -> mt.text("Pick an end date")))
+									.accessory(datePicker(dp -> dp.actionId("datepicker-action-end-date")
+											.initialDate("2022-12-25")
+											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
+							section(section -> section
+									.blockId("global-shortcut-launch-query-btn")
+									.text(markdownText(mt -> mt.text("You can initiate an investigation after launching the queries.")))
+									.accessory(button(btn -> btn
+											.text(plainText(pt -> pt.text("Launch Query").emoji(true)))
+											.value("global-shortcut-launch-query-btn").actionId("global-shortcut-launch-query-btn"))))
+					))
+			);
+			ViewsOpenResponse vw = ctx.client().viewsOpen(r -> r
+					.triggerId(ctx.getTriggerId())
+					.view(appHomeView));
+			return ctx.ack();
+		});
+
+		// Modal Show Graph.
+		app.blockAction("global-shortcut-launch-query-btn", (req, ctx) -> {
+			Query inputData = obj.processQueryData(req.getPayload().getView().getState().getValues());
+			boolean addStatus = obj.addQueryData(req.getPayload().getUser().getId(), inputData);
+
+			View appHomeView = view(view -> view
+					.type("modal")
+					.callbackId("global_shortcut_launch_query")
+					.title(viewTitle(title -> title.type("plain_text").text("Query Results").emoji(true)))
+					.submit(viewSubmit(submit -> submit.type("plain_text").text("Save Query").emoji(true)))
+					.close(viewClose(close -> close.type("plain_text").text("Cancel").emoji(true)))
+					.blocks(
+						asBlocks(
+							section(section -> section
+									.text(markdownText(mt -> mt.text(obj.generateMarkdownForQuery(inputData))))),
+							com.slack.api.model.block.Blocks.image(im -> im
+									.imageUrl("https://i1.wp.com/thetempest.co/wp-content/uploads/2017/08/The-wise-words-of-Michael-Scott-Imgur-2.jpg?w=1024&ssl=1")
+									.altText("appToken"))
+					))
+			);
+			ViewsUpdateResponse vw = ctx.client().viewsUpdate(r -> r
+					.viewId(req.getPayload().getView().getId())
+					.view(appHomeView));
+			return ctx.ack();
+		});
+
+		app.viewSubmission("global_shortcut_launch_query", (req, ctx) -> {
+			// Sent inputs: req.getPayload().getView().getState().getValues()
+			return ctx.ack();
+		});
+
+		app.blockAction("datepicker-action-start-date", (req, ctx) -> {
+			// Do something where
+			return ctx.ack();
+		});
+
+		app.blockAction("datepicker-action-end-date", (req, ctx) -> {
+			// Do something where
+			return ctx.ack();
+		});
+
+		// App Home Page.
+		app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
+			View appHomeView = view(view -> view
+					.type("home")
+					.blocks(asBlocks(
+							section(section -> section
+									.text(markdownText(mt -> mt.text("*Hi Shivam, Welcome to your personal investigation space!*")))),
+							divider(),
+							section(section -> section.text(markdownText(mt -> mt.text(
+									"You can now create your own investigations and execute queries from this home page. For more details please refer the documentation given on <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI|LOGAN Investigations Documentation>.")))),
+							divider(),
+							input(input -> input
+									.blockId("query-input")
+									.element(plainTextInput(pti -> pti.actionId("query-input-pti").maxLength(255)))
+									.label(plainText(pt -> pt.text("Query").emoji(true)))),
+							input(input -> input
+									.blockId("chart-input")
+									.label(plainText(pt -> pt.text("Chart Type").emoji(true)))
+									.element(staticSelect(
+									ss -> ss.placeholder(plainText(pt -> pt.text("Select an item").emoji(true)))
+									.options(obj.staticChartList())))),
 							section(section -> section
 									.blockId("start-date")
 									.text(markdownText(mt -> mt.text("Pick a start date")))
@@ -84,13 +231,67 @@ public class InvestigationApplication {
 											.initialDate("2022-12-25")
 											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
 							section(section -> section
-									.blockId("click-btn")
-									.text(markdownText(mt -> mt.text("Initiate an investigation")))
+									.blockId("launch-query-btn")
+									.text(markdownText(mt -> mt.text("You can initiate an investigation after launching the queries.")))
 									.accessory(button(btn -> btn
-											.text(plainText(pt -> pt.text("Create Investigation").emoji(true)))
-											.value("click_123").actionId("click-btn"))))
+											.text(plainText(pt -> pt.text("Launch Query").emoji(true)))
+											.value("launch-query-btn").actionId("launch-query-btn"))))
 			)));
 			ViewsPublishResponse vw = ctx.client().viewsPublish(r -> r.userId(payload.getEvent().getUser()).view(appHomeView));
+			return ctx.ack();
+		});
+		
+		app.blockAction("launch-query-btn", (req, ctx) -> {
+			Map<String, ViewState.Value> chartType = req.getPayload().getView().getState().getValues().get("chart-input");
+			List<ViewState.Value> values = new ArrayList<>(chartType.values());
+			ctx.logger.info("Selected chart type is : " + values.stream().findFirst().get().getSelectedOption().getValue());
+
+			View appHomeView = view(view -> view
+					.type("modal")
+					.callbackId("slack-view-sample")
+					.title(viewTitle(title -> title.type("plain_text").text("Slack View").emoji(true)))
+					.submit(viewSubmit(submit -> submit.type("plain_text").text("Submit").emoji(true)))
+					.close(viewClose(close -> close.type("plain_text").text("Cancel").emoji(true)))
+					.blocks(
+						asBlocks(
+							section(section -> section
+									.text(markdownText(mt -> mt.text("*Hi Shivam, Welcome to your personal investigation space!*")))),
+							divider(),
+							section(section -> section.text(markdownText(mt -> mt.text(
+									"You can now create your own investigations and execute queries from this home page. For more details please refer the documentation given on <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI|LOGAN Investigations Documentation>.")))),
+							divider(),
+							input(input -> input
+									.blockId("query-input")
+									.element(plainTextInput(pti -> pti.actionId("query-input-pti").maxLength(255)))
+									.label(plainText(pt -> pt.text("Query").emoji(true)))),
+							input(input -> input
+									.blockId("chart-input")
+									.label(plainText(pt -> pt.text("Chart Type").emoji(true)))
+									.element(staticSelect(
+									ss -> ss.placeholder(plainText(pt -> pt.text("Select an item").emoji(true)))
+									.options(obj.staticChartList())))),
+							section(section -> section
+									.blockId("start-date")
+									.text(markdownText(mt -> mt.text("Pick a start date")))
+									.accessory(datePicker(dp -> dp.actionId("datepicker-action")
+											.initialDate("2022-12-25")
+											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
+							section(section -> section
+									.blockId("end-date")
+									.text(markdownText(mt -> mt.text("Pick an end date")))
+									.accessory(datePicker(dp -> dp.actionId("datepicker-action")
+											.initialDate("2022-12-25")
+											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
+							section(section -> section
+									.blockId("launch-query-btn")
+									.text(markdownText(mt -> mt.text("You can initiate an investigation after launching the queries.")))
+									.accessory(button(btn -> btn
+											.text(plainText(pt -> pt.text("Launch Query").emoji(true)))
+											.value("launch-query-btn").actionId("launch-query-btn"))))
+			)));
+			ViewsOpenResponse vw = ctx.client().viewsOpen(r -> r
+					.triggerId(ctx.getTriggerId())
+					.view(appHomeView));
 			return ctx.ack();
 		});
 
@@ -161,26 +362,6 @@ public class InvestigationApplication {
             // Acknowledge incoming command event
             return ctx.ack();
         });
-
-		// Global shortcuts.
-		app.globalShortcut("launch_query", (req, ctx) -> {
-			View appHomeView = view(view -> view
-					.type("modal")
-					.callbackId("slack-view-sample")
-					.title(viewTitle(title -> title.type("plain_text").text("Slack View").emoji(true)))
-					.submit(viewSubmit(submit -> submit.type("plain_text").text("Submit").emoji(true)))
-					.close(viewClose(close -> close.type("plain_text").text("Cancel").emoji(true)))
-					.blocks(asBlocks(
-							section(section -> section
-									.text(markdownText(mt -> mt.text("*Hi Shivam, Welcome to your personal space*")))),
-							divider(),
-							section(section -> section.text(markdownText(mt -> mt.text(
-									"You can create your own investigations and execute queries from this home page. For more details please refer <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI>.")))))));
-			ViewsOpenResponse vw = ctx.client().viewsOpen(r -> r
-					.triggerId(ctx.getTriggerId())
-					.view(appHomeView));
-			return ctx.ack();
-		});
 
 		// Message shortcuts.
 		app.messageShortcut("open_investigation", (req, ctx) -> {
