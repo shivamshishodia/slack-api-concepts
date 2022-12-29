@@ -172,7 +172,7 @@ public class InvestigationApplication {
 							section(section -> section
 									.text(markdownText(mt -> mt.text(obj.generateMarkdownForQuery(inputData))))),
 							com.slack.api.model.block.Blocks.image(im -> im
-									.imageUrl("https://i1.wp.com/thetempest.co/wp-content/uploads/2017/08/The-wise-words-of-Michael-Scott-Imgur-2.jpg?w=1024&ssl=1")
+									.imageUrl("https://images.edrawsoft.com/articles/create-pie-chart/blank-pie-chart.png")
 									.altText("appToken"))
 					))
 			);
@@ -197,7 +197,129 @@ public class InvestigationApplication {
 			return ctx.ack();
 		});
 
-		// App Home Page.
+		// App Message Tab Flow
+		// (App Message > Slash Command > Show Graph > Message Shortcut)
+		app.command("/query", (req, ctx) -> {
+			Logger logger = ctx.logger;
+			try {
+				ChatPostMessageResponse result = ctx.client().chatPostMessage(r -> r
+						.channel(req.getContext().getChannelId())
+						.blocks(asBlocks(
+							section(section -> section
+									.text(markdownText(mt -> mt.text("*Query and Investigation Interface!*")))),
+							divider(),
+							section(section -> section.text(markdownText(mt -> mt.text(
+									"You can execute your own queries and create own investigations using this interface. For more details please refer the documentation given on <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI|LOGAN Investigations Documentation>.")))),
+							divider(),
+							input(input -> input
+									.blockId("query-input")
+									.element(plainTextInput(pti -> pti.actionId("query-input-pti").maxLength(255)))
+									.label(plainText(pt -> pt.text("Query").emoji(true)))),
+							input(input -> input
+									.blockId("chart-input")
+									.label(plainText(pt -> pt.text("Chart Type").emoji(true)))
+									.element(staticSelect(
+									ss -> ss.placeholder(plainText(pt -> pt.text("Select an item").emoji(true)))
+									.options(obj.staticChartList())))),
+							section(section -> section
+									.blockId("start-date")
+									.text(markdownText(mt -> mt.text("Pick a start date")))
+									.accessory(datePicker(dp -> dp.actionId("datepicker-action-start-date")
+											.initialDate("2022-12-25")
+											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
+							section(section -> section
+									.blockId("end-date")
+									.text(markdownText(mt -> mt.text("Pick an end date")))
+									.accessory(datePicker(dp -> dp.actionId("datepicker-action-end-date")
+											.initialDate("2022-12-25")
+											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
+							section(section -> section
+									.blockId("slash-command-launch-query-btn")
+									.text(markdownText(mt -> mt.text("You can initiate an investigation after launching the queries.")))
+									.accessory(button(btn -> btn
+											.text(plainText(pt -> pt.text("Launch Query").emoji(true)))
+											.value("slash-command-launch-query-btn").actionId("slash-command-launch-query-btn"))))
+					)));
+				logger.info("result: {}", result);
+			} catch (IOException | SlackApiException e) {
+				logger.error("error: {}", e.getMessage(), e);
+			}
+			return ctx.ack();
+		});
+
+		// Modal Show Graph.
+		app.blockAction("slash-command-launch-query-btn", (req, ctx) -> {
+			Query inputData = obj.processQueryData(req.getPayload().getState().getValues());
+			boolean addStatus = obj.addQueryData(req.getPayload().getUser().getId(), inputData);
+
+            var logger = ctx.logger;
+            try {
+                var payload = req.getPayload();
+				String chartType;
+				switch (inputData.getChartType()) {
+					case "data":
+					chartType = "chart-" + inputData.getChartType() + ".png";
+					break;
+					case "histogram":
+					chartType = "chart-" + inputData.getChartType() + ".jpeg";
+					break;
+					case "pie":
+					chartType = "chart-" + inputData.getChartType() + ".png";
+					break;
+					default:
+					chartType = "chart-data.png";
+					break;
+				}
+                // The name of the file you're going to upload
+				String userDirectory = Paths.get("").toAbsolutePath().toString();
+                var filepath = userDirectory + "/beginner/messaging-app/src/main/java/com/shishodia/slack/resources/" + chartType;
+                // Call the files.upload method using the built-in WebClient
+                var result = ctx.client().filesUpload(r -> r
+                    // The token you used to initialize your app is stored in the `context` object
+                    // .token(ctx.getBotToken())
+                    .channels(Arrays.asList(payload.getChannel().getId()))
+                    .initialComment(obj.generateMarkdownForQuery(inputData))
+                    // Include your filename in a ReadStream here
+					.filename(UUID.randomUUID().toString())
+                    .file(new File(filepath))
+                );
+                // Print result
+                logger.info("result: {}", result);
+            } catch (IOException | SlackApiException e) {
+                logger.error("error: {}", e.getMessage(), e);
+            }
+            // Acknowledge incoming command event
+            return ctx.ack();
+		});
+
+		// Message shortcuts.
+		app.messageShortcut("open_investigation", (req, ctx) -> {
+			String queryContext = req.getPayload().getMessage().getText();
+			View appHomeView = view(view -> view
+					.type("modal")
+					.callbackId("open_investigation_launch_query")
+					.title(viewTitle(title -> title.type("plain_text").text("Create").emoji(true)))
+					.submit(viewSubmit(submit -> submit.type("plain_text").text("Create Investigation").emoji(true)))
+					.close(viewClose(close -> close.type("plain_text").text("Cancel").emoji(true)))
+					.blocks(
+						asBlocks(
+							section(section -> section
+									.text(markdownText(mt -> mt.text(queryContext))))
+					))
+			);
+			ViewsOpenResponse vw = ctx.client().viewsOpen(r -> r
+				.triggerId(ctx.getTriggerId())
+				.view(appHomeView));
+			return ctx.ack();
+		});
+
+		app.viewSubmission("open_investigation_launch_query", (req, ctx) -> {
+			// Sent inputs: req.getPayload().getView().getState().getValues()
+			return ctx.ack();
+		});
+
+		// App Home Page Flow.
+		// (App Home > Show Graph Modal > Create Investigation)
 		app.event(AppHomeOpenedEvent.class, (payload, ctx) -> {
 			View appHomeView = view(view -> view
 					.type("home")
@@ -316,11 +438,6 @@ public class InvestigationApplication {
 			return ctx.ack();
 		});
 
-		// Modal Enablement.
-		app.command("/modal", (req, ctx) -> {
-			return ctx.ack();
-		});
-
 		// Command Enablement.
 		app.command("/chart", (req, ctx) -> {
             var logger = ctx.logger;
@@ -362,56 +479,6 @@ public class InvestigationApplication {
             // Acknowledge incoming command event
             return ctx.ack();
         });
-
-		// Message shortcuts.
-		app.messageShortcut("open_investigation", (req, ctx) -> {
-			Logger logger = ctx.logger;
-			try {
-                // MessageEvent event = req.getContext().getChannelId();
-                // Call the chat.postMessage method using the built-in WebClient
-                ChatPostMessageResponse result = ctx.client().chatPostMessage(r -> r
-                    // The token you used to initialize your app is stored in the `context` object
-                    // .token(ctx.getBotToken())
-                    // Payload message should be posted in the channel where original message was heard
-                    .channel(req.getContext().getChannelId())
-					.blocks(
-						asBlocks(
-						section(section -> section
-								.text(markdownText(mt -> mt.text("*Hi Shivam, Welcome to your personal space*")))),
-						divider(),
-						section(section -> section.text(markdownText(mt -> mt.text(
-								"You can create your own investigations and execute queries from this home page. For more details please refer <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI>.")))),
-						divider(),
-						input(input -> input
-								.blockId("query-input")
-								.element(plainTextInput(pti -> pti.actionId("query-input-pti").maxLength(255)))
-								.label(plainText(pt -> pt.text("Query").emoji(true)))),
-						section(section -> section
-								.blockId("start-date")
-								.text(markdownText(mt -> mt.text("Pick a start date")))
-								.accessory(datePicker(dp -> dp.actionId("datepicker-action")
-										.initialDate("2022-12-25")
-										.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
-						section(section -> section
-								.blockId("end-date")
-								.text(markdownText(mt -> mt.text("Pick an end date")))
-								.accessory(datePicker(dp -> dp.actionId("datepicker-action")
-										.initialDate("2022-12-25")
-										.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
-						section(section -> section
-								.blockId("click-btn")
-								.text(markdownText(mt -> mt.text("Initiate an investigation")))
-								.accessory(button(btn -> btn
-										.text(plainText(pt -> pt.text("Create Investigation").emoji(true)))
-										.value("click_123").actionId("click-btn")))))
-					)
-                );
-                logger.info("result: {}", result);
-            } catch (IOException | SlackApiException e) {
-                logger.error("error: {}", e.getMessage(), e);
-            }
-			return ctx.ack(); // respond with 200 OK to the request
-		  });
 
 		SocketModeApp socketModeApp = new SocketModeApp(appToken, app);
 		socketModeApp.start();
