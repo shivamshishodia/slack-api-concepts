@@ -12,7 +12,6 @@ import com.slack.api.methods.response.views.ViewsUpdateResponse;
 import com.slack.api.model.block.composition.OptionObject;
 import com.slack.api.model.event.AppHomeOpenedEvent;
 import com.slack.api.model.view.View;
-import com.slack.api.model.view.ViewState;
 import com.slack.api.model.view.ViewState.Value;
 
 import static com.slack.api.model.view.Views.*;
@@ -343,98 +342,59 @@ public class InvestigationApplication {
 							section(section -> section
 									.blockId("start-date")
 									.text(markdownText(mt -> mt.text("Pick a start date")))
-									.accessory(datePicker(dp -> dp.actionId("datepicker-action")
+									.accessory(datePicker(dp -> dp.actionId("datepicker-action-start-date")
 											.initialDate("2022-12-25")
 											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
 							section(section -> section
 									.blockId("end-date")
 									.text(markdownText(mt -> mt.text("Pick an end date")))
-									.accessory(datePicker(dp -> dp.actionId("datepicker-action")
+									.accessory(datePicker(dp -> dp.actionId("datepicker-action-end-date")
 											.initialDate("2022-12-25")
 											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
 							section(section -> section
-									.blockId("launch-query-btn")
+									.blockId("app-home-launch-query-btn")
 									.text(markdownText(mt -> mt.text("You can initiate an investigation after launching the queries.")))
 									.accessory(button(btn -> btn
 											.text(plainText(pt -> pt.text("Launch Query").emoji(true)))
-											.value("launch-query-btn").actionId("launch-query-btn"))))
+											.value("app-home-launch-query-btn").actionId("app-home-launch-query-btn"))))
 			)));
 			ViewsPublishResponse vw = ctx.client().viewsPublish(r -> r.userId(payload.getEvent().getUser()).view(appHomeView));
 			return ctx.ack();
 		});
 		
-		app.blockAction("launch-query-btn", (req, ctx) -> {
-			Map<String, ViewState.Value> chartType = req.getPayload().getView().getState().getValues().get("chart-input");
-			List<ViewState.Value> values = new ArrayList<>(chartType.values());
-			ctx.logger.info("Selected chart type is : " + values.stream().findFirst().get().getSelectedOption().getValue());
+		app.blockAction("app-home-launch-query-btn", (req, ctx) -> {
+			Query inputData = obj.processQueryData(req.getPayload().getView().getState().getValues());
+			boolean addStatus = obj.addQueryData(req.getPayload().getUser().getId(), inputData);
 
 			View appHomeView = view(view -> view
 					.type("modal")
-					.callbackId("slack-view-sample")
-					.title(viewTitle(title -> title.type("plain_text").text("Slack View").emoji(true)))
-					.submit(viewSubmit(submit -> submit.type("plain_text").text("Submit").emoji(true)))
+					.callbackId("app_home_launch_query")
+					.title(viewTitle(title -> title.type("plain_text").text("Query Results").emoji(true)))
+					.submit(viewSubmit(submit -> submit.type("plain_text").text("Save Query").emoji(true)))
 					.close(viewClose(close -> close.type("plain_text").text("Cancel").emoji(true)))
 					.blocks(
 						asBlocks(
 							section(section -> section
-									.text(markdownText(mt -> mt.text("*Hi Shivam, Welcome to your personal investigation space!*")))),
-							divider(),
-							section(section -> section.text(markdownText(mt -> mt.text(
-									"You can now create your own investigations and execute queries from this home page. For more details please refer the documentation given on <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI|LOGAN Investigations Documentation>.")))),
-							divider(),
-							input(input -> input
-									.blockId("query-input")
-									.element(plainTextInput(pti -> pti.actionId("query-input-pti").maxLength(255)))
-									.label(plainText(pt -> pt.text("Query").emoji(true)))),
-							input(input -> input
-									.blockId("chart-input")
-									.label(plainText(pt -> pt.text("Chart Type").emoji(true)))
-									.element(staticSelect(
-									ss -> ss.placeholder(plainText(pt -> pt.text("Select an item").emoji(true)))
-									.options(obj.staticChartList())))),
+									.text(markdownText(mt -> mt.text(obj.generateMarkdownForQuery(inputData))))),
+							com.slack.api.model.block.Blocks.image(im -> im
+									.imageUrl("https://images.edrawsoft.com/articles/create-pie-chart/blank-pie-chart.png")
+									.altText("appToken")),
 							section(section -> section
-									.blockId("start-date")
-									.text(markdownText(mt -> mt.text("Pick a start date")))
-									.accessory(datePicker(dp -> dp.actionId("datepicker-action")
-											.initialDate("2022-12-25")
-											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
-							section(section -> section
-									.blockId("end-date")
-									.text(markdownText(mt -> mt.text("Pick an end date")))
-									.accessory(datePicker(dp -> dp.actionId("datepicker-action")
-											.initialDate("2022-12-25")
-											.placeholder(plainText(pt -> pt.text("Select a date").emoji(true)))))),
-							section(section -> section
-									.blockId("launch-query-btn")
-									.text(markdownText(mt -> mt.text("You can initiate an investigation after launching the queries.")))
+									.blockId("app-home-investigate-btn")
+									.text(markdownText(mt -> mt.text("You can now initiate an investigation.")))
 									.accessory(button(btn -> btn
-											.text(plainText(pt -> pt.text("Launch Query").emoji(true)))
-											.value("launch-query-btn").actionId("launch-query-btn"))))
-			)));
+											.text(plainText(pt -> pt.text("Initiate Investigation").emoji(true)))
+											.value("app-home-investigate-btn").actionId("app-home-investigate-btn"))))
+					))
+			);
 			ViewsOpenResponse vw = ctx.client().viewsOpen(r -> r
-					.triggerId(ctx.getTriggerId())
-					.view(appHomeView));
+				.triggerId(ctx.getTriggerId())
+				.view(appHomeView));
 			return ctx.ack();
 		});
 
-		app.blockAction("click-btn", (req, ctx) -> {
-			// Do something where
-			View appHomeView = view(view -> view
-			.type("modal")
-			.callbackId("slack-view-sample")
-			.title(viewTitle(title -> title.type("plain_text").text("Slack View").emoji(true)))
-			.submit(viewSubmit(submit -> submit.type("plain_text").text("Submit").emoji(true)))
-			.close(viewClose(close -> close.type("plain_text").text("Cancel").emoji(true)))
-			.blocks(asBlocks(
-					section(section -> section
-							.text(markdownText(mt -> mt.text("*Hi Shivam, Welcome to your personal space*")))),
-					divider(),
-					section(section -> section.text(markdownText(mt -> mt.text(
-							"You can create your own investigations and execute queries from this home page. For more details please refer <https://confluence.oci.oraclecorp.com/display/LOGAN/Investigations+-+proposed+design+in+OCI>."))))
-			)));
-			ViewsOpenResponse vw = ctx.client().viewsOpen(r -> r
-					.triggerId(ctx.getTriggerId())
-					.view(appHomeView));
+		app.viewSubmission("app_home_launch_query", (req, ctx) -> {
+			// Sent inputs: req.getPayload().getView().getState().getValues()
 			return ctx.ack();
 		});
 
