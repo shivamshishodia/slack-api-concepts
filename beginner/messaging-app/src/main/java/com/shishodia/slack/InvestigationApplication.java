@@ -356,7 +356,17 @@ public class InvestigationApplication {
 									.text(markdownText(mt -> mt.text("You can initiate an investigation after launching the queries.")))
 									.accessory(button(btn -> btn
 											.text(plainText(pt -> pt.text("Launch Query").emoji(true)))
-											.value("app-home-launch-query-btn").actionId("app-home-launch-query-btn"))))
+											.value("app-home-launch-query-btn").actionId("app-home-launch-query-btn")))),
+							divider(),
+							section(section -> section
+							.text(markdownText(mt -> mt.text("*Latest Queries*")))),
+							divider(),
+							section(section -> section.text(markdownText(mt -> mt.text(
+								"`pie` chart generated for query `select * from logs` or date range between `2022-10-22` and `2022-10-22`")))),
+							section(section -> section.text(markdownText(mt -> mt.text(
+								"`histogram` chart generated for query `select * from error_logs` or date range between `2022-09-22` and `2022-09-30`")))),
+							section(section -> section.text(markdownText(mt -> mt.text(
+								"`data` chart generated for query `select * from logs | asc` or date range between `2022-09-22` and `2022-10-22`"))))
 			)));
 			ViewsPublishResponse vw = ctx.client().viewsPublish(r -> r.userId(payload.getEvent().getUser()).view(appHomeView));
 			return ctx.ack();
