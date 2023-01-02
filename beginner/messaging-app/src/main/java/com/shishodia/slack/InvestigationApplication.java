@@ -277,6 +277,7 @@ public class InvestigationApplication {
                     // The token you used to initialize your app is stored in the `context` object
                     // .token(ctx.getBotToken())
                     .channels(Arrays.asList(payload.getChannel().getId()))
+					.threadTs(req.getPayload().getMessage().getTs())
                     .initialComment(obj.generateMarkdownForQuery(inputData))
                     // Include your filename in a ReadStream here
 					.filename(UUID.randomUUID().toString())
@@ -359,7 +360,7 @@ public class InvestigationApplication {
 											.value("app-home-launch-query-btn").actionId("app-home-launch-query-btn")))),
 							divider(),
 							section(section -> section
-							.text(markdownText(mt -> mt.text("*Latest Queries*")))),
+							.text(markdownText(mt -> mt.text("*Recent Queries*")))),
 							divider(),
 							section(section -> section.text(markdownText(mt -> mt.text(
 								"`pie` chart generated for query `select * from logs` or date range between `2022-10-22` and `2022-10-22`")))),
